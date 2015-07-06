@@ -6,12 +6,12 @@ require(Rstem)
 
 load('PDT_2015.RData')
 
-junk <- c('dept', 'department', 'inc', 'llp', 'llc', 'company', 'and')
+junk <- c('dept', 'department', 'inc', 'llp', 'llc', 'company', 'and', 'iii','ii')
 
 corpus <- Corpus(VectorSource(final$title))
 corpus <- tm_map(corpus, removePunctuation)
 corpus <- tm_map(corpus, content_transformer(tolower))
-corpus <- tm_map(corpus, removeWords, 'english')
+corpus <- tm_map(corpus, removeWords, stopwords('english'))
 corpus <- tm_map(corpus, removeWords, junk)
 
 tdm <- TermDocumentMatrix(corpus)
@@ -36,9 +36,9 @@ d <- d[order(d$freq, decreasing = T), ]
 
 # print wordcloud:
 set.seed(995)
-png('wordcloud_title.png',width = 900, height = 900, res = 72*3)
+png('wordcloud_title.png',width = 800, height = 750, res = 72*3)
 wordcloud(d$word, d$freq, scale=c(3,0.5),
-          random.order=FALSE, rot.per=0.20,  
+          random.order=FALSE, rot.per=0.00,  
           use.r.layout=FALSE, colors=brewer.pal(8, 'Dark2'))
 dev.off()
 shell.exec('wordcloud_title.png')

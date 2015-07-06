@@ -2,7 +2,7 @@
 require(readxl)
 require(dplyr)
 
-raw <- read_excel('PDT2015 Attendee List for Sponsors_Exhibitors.xlsx', sheet = 1)
+raw <- read_excel('PDT2015 Attendee List for Sponsors_Exhibitors_v2.xlsx', sheet = 1)
 
 
 dat <- raw %>% 
@@ -32,6 +32,7 @@ dat <- raw %>%
 # Fuzzy matching
 unique(agrep('McLean, VA', dat$loc, value = T, ignore.case = T))
 unique(agrep('Washington, DC', dat$loc, value = T, ignore.case = T))
+unique(agrep('La Plata, MD', dat$loc, value = T, ignore.case = T))
 
 
 fuzz <- lapply(unique(dat$loc), 
@@ -53,6 +54,7 @@ loc_clean("Ft. George G. Meade, MD", "Fort George G. Meade, MD")
 loc_clean("Herndon, VA")
 loc_clean("Indianapolis, IN")
 loc_clean("McLean, VA")
+loc_clean("La Plata, MD")
 loc_clean("St. Louis, MO")
 
 dat$loc[dat$loc=='Rockivlle, MD'] <- 'Rockville, MD'
