@@ -1,0 +1,250 @@
+---
+title: "AGA 2015 PDT Conference"
+subtitle: "Attendee List"
+author: "FI Consulting"
+date: "July 12-15, 2015"
+output:
+  html_document:
+    theme: united
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+
+require(knitr)
+require(DT)
+require(dplyr)
+require(googleVis)
+require(stringr)
+require(scales)
+require(png)
+require(jpeg)
+require(grid)
+require(leaflet)
+
+
+
+load('PDT_2015.RData')
+
+op <- options(gvis.plot.tag='chart')
+opts_chunk$set(echo = FALSE, results='asis', size="small", fig.align='center')
+
+
+```
+
+```{r logo, fig.width=0.75*309/72, fig.height=0.75*163/72}
+img <- readPNG('aga_logo.png')
+grid.raster(img)
+```
+
+```{r nash, fig.width=0.50*757/72, fig.height=0.50*257/72}
+img <- readJPEG('nashville_guitar.jpg')
+grid.raster(img)
+```
+
+
+---- 
+
+# Attendees Search
+
+Filter/Sort by Attendee Name, Title, Organization, City, or State
+```{r search}
+
+datatable(
+  select(final, state, loc, name, title, company), 
+  colnames = c('State', 'City', 'Name', 'Title', 'Organization'),
+  class = 'row-border stripe compact order-column hover',
+  options=list(pageLength = 10, lengthMenu = c(5, 10, 20, 50, 100, 500)),
+  rownames=FALSE)
+
+```
+
+# Attendance by Geographic Location
+
+## Number of Attendants by City 
+```{r leaflet}
+map.dat <- agg.city %>%
+  filter(!is.na(city)) %>%
+  mutate(Tip = paste(city, Attendees, sep = " : ")) 
+
+# bounds
+bounds <- map.dat %>% 
+  filter(!grepl('GU|AK|HI',state)) %>% 
+  ungroup() %>% 
+  summarize(lon1 = min(lon),
+            lon2 = max(lon),
+            lat1 = min(lat),
+            lat2 = max(lat))
+
+
+leaflet(data = map.dat,
+        width = 900, height = 450) %>% 
+  addTiles() %>%
+  fitBounds(bounds$lon1,bounds$lat1,bounds$lon2,bounds$lat2) %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  # addMarkers(~long, ~lat, popup = ~Tip) 
+  addCircleMarkers(
+    ~lon, ~lat, popup = ~Tip,
+    radius = ~sqrt(Attendees)*2,
+    color = 'green',
+    stroke = FALSE, fillOpacity = 0.5)
+
+```
+
+
+## Top States  
+```{r geo, fig.align='center'}
+
+#top States data
+dat.st<- agg.state %>%
+  mutate(pct = Attendees/sum(Attendees),
+         state = ifelse(pct>.02,state, 'Other'),
+         state = ifelse(is.na(state),'Other',state)) %>%
+  group_by(state) %>%
+  summarise(Attendees = sum(Attendees)) %>%
+  arrange(-Attendees)
+
+
+# States Map
+GeoStates <- gvisGeoChart(
+  data = filter(agg.state, !is.na(state)), 
+  "state", "Attendees",
+  options=list(region="US", magnifyingGlass.enable=T, 
+               displayMode="regions", 
+               resolution="provinces",
+               width=900, height=500))
+
+plot(GeoStates)
+
+
+```
+
+
+```{r}
+# Top States Pie chart
+
+#top States data
+dat.st<- agg.state %>%
+  mutate(pct = Attendees/sum(Attendees),
+         state = ifelse(pct>.05,state, 'Other'),
+         state = ifelse(is.na(state),'Other',state)) %>%
+  group_by(state) %>%
+  summarise(Attendees = sum(Attendees)) %>%
+  arrange(-Attendees)
+
+
+Pie <- gvisPieChart(
+  dat.st,
+  options=list(
+    title="Attendees by State",
+    titleTextStyle="{fontSize:20}",
+    legend = "{position: 'top', fontSize:10}",
+    pieSliceText = 'label',
+    width=900, height=500,
+    pieHole=0.35
+  )
+)
+
+plot(Pie)
+
+```
+
+## Top Cities
+
+```{r}
+#Top Cities Bar Plot
+
+#top Cities data
+dat.city<- 
+  ungroup(agg.city) %>%
+  select(city, Attendees) %>%
+  filter(!is.na(city)) %>% 
+  top_n(n = 10,wt = Attendees) %>% 
+  arrange(-Attendees)
+
+
+Bar <- gvisBarChart(dat.city, options = list(
+  series = "[{color: 'red'}]",
+  titleTextStyle="{fontSize:20}",
+  width=900,height=500, legend='none', 
+  title="Top Cities"))
+plot(Bar)
+
+```
+
+
+
+# Attendees' Certifications, Degrees, and other Designations  
+
+```{r designations}
+
+agg.certs <-  
+  str_split(final$desig, ', *') %>% 
+  unlist() %>% 
+  gsub('-Retired|-Retir','',x = .) %>% 
+  gsub('PhD','Ph.D.', x = .) %>% 
+  data.frame(desig=.,stringsAsFactors = F) %>% 
+  filter(!is.na(desig) & desig!='CIA') %>% 
+  group_by(desig) %>%
+  summarize(Count=n()) %>%
+  arrange(-Count)
+
+
+agg.certs.top <- 
+  agg.certs %>%
+  mutate(Pct = Count/nrow(final),
+         desig = ifelse(Pct<.03, 'Other', desig)) %>%
+  group_by(desig) %>%
+  summarize(Count = sum(Count),
+            Pct = round(Count/nrow(final),2)) %>%
+  arrange(-Count) %>%
+  select(-Count) 
+
+
+Bar1 <- gvisBarChart(
+  agg.certs, 
+  options = list(
+    title="Number of Attendees by Designation",
+    titleTextStyle="{fontSize:28}",
+    fontSize = 11,
+    width=1100, height=900, 
+    legend='none'))
+
+plot(Bar1)
+```
+
+
+```{r designations_2}
+Bar2 <- gvisColumnChart(
+  agg.certs.top, 
+  options = list(
+    legend='none',
+    series = "[{color: 'red'}]",
+    titleTextStyle="{fontSize:20}",
+    vAxes="[{title:'Percent of all attendees',
+             format:'#,###%',
+             textPosition: 'out'}]",
+    width=800,height=600, legend='none', 
+    title="% of Total"))
+
+plot(Bar2)
+```
+
+
+# Most frequent Job Titles and Organizations
+
+## Job Titles  
+```{r cloud, fig.width=6, fig.height=6}
+img <- readPNG('wordcloud_title.png')
+grid.raster(img)
+```
+
+## Organizations  
+```{r cloud2, fig.width=6, fig.height=6}
+img <- readPNG('wordcloud_org.png')
+grid.raster(img)
+```
+
+# Data Source
+Official attendee list can be downloaded from [here](https://www.agacgfm.org/PDT2015/Home.aspx)
